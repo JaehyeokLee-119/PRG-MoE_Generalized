@@ -2,7 +2,7 @@
 
 Non-official implementation of [Conversational Emotion-Cause Pair Extraction with Guided Mixture of Experts](https://github.com/jdjin3000/PRG-MoE)
 
-추가적인 실험을 위해 다양한 pre-trained model에 대해 generalize, additional metrics 도입 수행 예정 
+추가적인 실험을 위해 다양한 pre-trained model에 대해 generalize, additional metrics 도입 수행 예정 <br>
 [PRG-MoE](https://github.com/jdjin3000/PRG-MoE) referenced
 
 ## Dependencies
