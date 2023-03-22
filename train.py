@@ -26,12 +26,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='This code is for ECPE task.')
 
     # Training Environment
-    parser.add_argument('--gpus', default=[0])
+    parser.add_argument('--gpus', default=[2])
     parser.add_argument('--num_process', default=int(os.cpu_count() * 0.8), type=int)
     parser.add_argument('--num_worker', default=6, type=int)
-    parser.add_argument('--port', default=1234, type=int)
+    parser.add_argument('--port', default=1235, type=int)
 
     parser.add_argument('--model_name', default='PRG_MoE')
+    
+    parser.add_argument('--encoder_name', default='bert-large-cased')
     parser.add_argument('--pretrained_model', default=None)
     parser.add_argument('--test', default=False)
 
@@ -67,29 +69,32 @@ def test_preconditions(args: argparse.Namespace):
 
 def main():
     args = parse_args()
-
     test_preconditions(args)
-
     set_random_seed(77)
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(_) for _ in args.gpus])
 
-    train_data_list = [
-        'data/data_fold/data_0/dailydialog_train.json',
-        * [f'data/data_fold/data_{fold_}/data_{fold_}_train.json' for fold_ in range(1, 5)]
-    ]
-    valid_data_list = [
-        'data/data_fold/data_0/dailydialog_valid.json',
-        * [f'data/data_fold/data_{fold_}/data_{fold_}_valid.json' for fold_ in range(1, 5)]
-    ]
-    test_data_list = [
-        'data/data_fold/data_0/dailydialog_test.json',
-        * [f'data/data_fold/data_{fold_}/data_{fold_}_test.json' for fold_ in range(1, 5)]
-    ]
-    data_label = ['-original_data_DailyDialog', *[f'-data_{fold_}_DailyDialog' for fold_ in range(1, 5)]]
+    # train_data_list = [
+    #     'data/data_fold/data_0/dailydialog_train.json',
+    #     * [f'data/data_fold/data_{fold_}/data_{fold_}_train.json' for fold_ in range(1, 5)]
+    # ]
+    # valid_data_list = [
+    #     'data/data_fold/data_0/dailydialog_valid.json',
+    #     * [f'data/data_fold/data_{fold_}/data_{fold_}_valid.json' for fold_ in range(1, 5)]
+    # ]
+    # test_data_list = [
+    #     'data/data_fold/data_0/dailydialog_test.json',
+    #     * [f'data/data_fold/data_{fold_}/data_{fold_}_test.json' for fold_ in range(1, 5)]
+    # ]
+    
+    train_data_list = ['data/data_mini/dailydialog_train.json']
+    valid_data_list = ['data/data_mini/dailydialog_valid.json']
+    test_data_list = ['data/data_mini/dailydialog_test.json']
+    
+    data_label = ['-mini_data']
 
-    model_name_list = ['PRG_MoE']
-    log_directory_list = ['logs/train_PRG_MoE']
+    model_name_list = ['PRG_MoE_General']
+    log_directory_list = ['logs/train-testing_General']
 
     for tr, va, te, dl in zip(train_data_list, valid_data_list, test_data_list, data_label):
         args.train_data, args.valid_data, args.test_data, args.data_label = tr, va, te, dl

@@ -1,6 +1,6 @@
 import json
 import torch
-from transformers import BertTokenizer
+from transformers import BertTokenizer, AutoTokenizer
 
 def get_data(data_file, device, max_seq_len, contain_context=False):
     f = open(data_file)
@@ -90,12 +90,12 @@ def get_data(data_file, device, max_seq_len, contain_context=False):
 
     return preprocessed_utterance, out_speaker.to(device), out_emotion_label.to(device), out_pair_cause_label.to(device), out_pair_binary_cause_label.to(device)
 
-def load_utterance(data_file, device, max_seq_len):
+def load_utterance(data_file, device, max_seq_len, model_name='bert-base-cased'):
     f = open(data_file)
     data = json.load(f)
     f.close()
 
-    tokenizer_ = BertTokenizer.from_pretrained('bert-base-cased')
+    tokenizer_ = AutoTokenizer.from_pretrained(model_name)
 
     max_seq_len = max_seq_len
     max_doc_len = 0
@@ -137,7 +137,7 @@ def load_utterance(data_file, device, max_seq_len):
     out_utterance_input_ids, out_utterance_attention_mask, out_utterance_token_type_ids = torch.stack(out_utterance_input_ids), torch.stack(out_utterance_attention_mask), torch.stack(out_utterance_token_type_ids)
     return (out_utterance_input_ids.to(device), out_utterance_attention_mask.to(device), out_utterance_token_type_ids.to(device)), max_doc_len, max_seq_len
 
-def load_utterance_with_context(data_file, device, max_seq_len):
+def load_utterance_with_context(data_file, device, max_seq_len, model_name='bert-base-cased'):
     def make_context(utterance_list, start_t, end_t, max_seq_len):
         context = " ".join(utterance_list[start_t:end_t])
 
@@ -156,7 +156,7 @@ def load_utterance_with_context(data_file, device, max_seq_len):
     data = json.load(f)
     f.close()
 
-    tokenizer_ = BertTokenizer.from_pretrained('bert-base-cased')
+    tokenizer_ = AutoTokenizer.from_pretrained(model_name)
 
     max_seq_len = max_seq_len
     max_doc_len = 0
@@ -204,8 +204,8 @@ def load_utterance_with_context(data_file, device, max_seq_len):
     out_utterance_input_ids, out_utterance_attention_mask, out_utterance_token_type_ids = torch.stack(out_utterance_input_ids), torch.stack(out_utterance_attention_mask), torch.stack(out_utterance_token_type_ids)
     return (out_utterance_input_ids.to(device), out_utterance_attention_mask.to(device), out_utterance_token_type_ids.to(device)), max_doc_len, max_seq_len
 
-def tokenize_conversation(conversation, device, max_seq_len):
-    tokenizer_ = BertTokenizer.from_pretrained('bert-base-cased')
+def tokenize_conversation(conversation, device, max_seq_len, model_name='bert-base-cased'):
+    tokenizer_ = AutoTokenizer.from_pretrained(model_name)
 
     max_seq_len = max_seq_len
     max_doc_len = 0

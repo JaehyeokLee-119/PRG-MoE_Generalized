@@ -65,6 +65,7 @@ class LearningEnv:
         n_cause,
         n_expert,
         guiding_lambda,
+        encoder_name,
         **kwargs,
     ):
         self.n_cause = n_cause
@@ -76,6 +77,7 @@ class LearningEnv:
             "n_cause": n_cause,
             "n_expert": n_expert,
             "guiding_lambda": guiding_lambda,
+            "encoder_name": encoder_name,
         }
 
         if pretrained_model is not None:
