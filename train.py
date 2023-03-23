@@ -34,6 +34,8 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument('--encoder_name', default='bert-base-cased', type=str)
     parser.add_argument('--model_name', default='PRG_MoE')
+    # 0: no freeze, n>0: # of unfreezed layers
+    parser.add_argument('--unfreeze', default=3, type=int)
 
     parser.add_argument('--pretrained_model', default=None)
     parser.add_argument('--test', default=False)
@@ -113,9 +115,22 @@ def main():
     data_label = ['-original_fold']
 
     model_name = 'PRG_MoE_General'
-    encoder_name_list = ['j-hartmann/emotion-english-distilroberta-base']
-    log_directory_list = [
-        'logs/train-testing_General(5e-5, 40ep, distilroberta)']
+
+    # encoder_name_list = ['bert-base-cased',
+    #                      'j-hartmann/emotion-english-distilroberta-base',
+    #                      'j-hartmann/emotion-english-roberta-large']
+    # log_directory_list = ['logs/train-testing_General(5e-5, 40ep, bert-base-cased)',
+    #                       'logs/train-testing_General(5e-5, 40ep, distillroberta-emo)',
+    #                       'logs/train-testing_General(5e-5, 40ep, large-emo)']
+
+    encoder_name_list = ['j-hartmann/emotion-english-roberta-large',
+                         'bert-base-cased',
+                         'j-hartmann/emotion-english-distilroberta-base',
+                         ]
+    log_directory_list = [f'logs/train-testing_unfreeze{args.unfreeze}(5e-5, 40ep, large-emo)',
+                          f'logs/train-testing_unfreeze{args.unfreeze}(5e-5, 40ep, bert-base-cased)',
+                          f'logs/train-testing_unfreeze{args.unfreeze}(5e-5, 40ep, distillroberta-emo)',
+                          ]
 
     for tr, va, te, dl in zip(train_data_list, valid_data_list, test_data_list, data_label):
         args.train_data, args.valid_data, args.test_data, args.data_label = tr, va, te, dl
@@ -130,6 +145,7 @@ def main():
 
             del trainer
 
+    '''
     train_data_list = [
         f'data_fold_test_IEMOCAP/data_{fold_}/data_{fold_}_train.json' for fold_ in range(0, 5)]
     valid_data_list = [
@@ -150,6 +166,7 @@ def main():
             trainer.run(**vars(args))
 
             del trainer
+    '''
 
 
 if __name__ == "__main__":

@@ -7,27 +7,28 @@ from transformers import BertModel, AutoModel, AutoTokenizer
 import copy
 
 
-class Encoder_with_transformer(nn.Module):
+class Encoder_partial_freeze(nn.Module):
     '''
-    Encoder_with_transformer: 기존의 pretrained model의 encoder layer를 1개 추가해서 그거만 학습시킴
+    Encoder_partial_freeze: 기존의 pretrained model의 encoder layer를 몇 개만 풀어서 학습시킴
     '''
 
-    def __init__(self, encoder_name):
-        super(Encoder_with_transformer, self).__init__()
+    def __init__(self, encoder_name, unfreeze=3):
+        super(Encoder_partial_freeze, self).__init__()
 
         self.encoder = AutoModel.from_pretrained(encoder_name)
-        for param in self.encoder.parameters():
-            param.requires_grad = False
-
         self.num_hidden_layers = self.encoder.config.num_hidden_layers
 
-        for idx in range(self.num_hidden_layers-1, self.num_hidden_layers-3, -1):
-            for param in self.encoder.encoder.layer[idx].parameters():
+        if (unfreeze != 0):
+            print("unfreeze != 0")
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+
+            for idx in range(self.num_hidden_layers-1, self.num_hidden_layers-1-unfreeze, -1):
+                for param in self.encoder.encoder.layer[idx].parameters():
+                    param.requires_grad = True
+
+            for name, param in self.encoder.pooler.named_parameters():
                 param.requires_grad = True
-
-        for name, param in self.encoder.pooler.named_parameters():
-            param.requires_grad = True
-
         self.config = self.encoder.config
 
     def forward(self, input_ids, attention_mask, token_type_ids, return_dict=False):
@@ -43,13 +44,15 @@ class Encoder_with_transformer(nn.Module):
 
 
 class PRG_MoE_General(nn.Module):
-    def __init__(self, dropout=0.5, n_speaker=2, n_emotion=7, n_cause=2, n_expert=2, guiding_lambda=0, encoder_name='bert-base-cased', **kwargs):
+    def __init__(self, dropout=0.5, n_speaker=2, n_emotion=7, n_cause=2, n_expert=2, guiding_lambda=0, unfreeze=0, encoder_name='bert-base-cased', **kwargs):
         super(PRG_MoE_General, self).__init__()
 
         self.encoder_name = encoder_name
         # self.encoder = AutoModel.from_pretrained(encoder_name)
-        self.encoder = Encoder_with_transformer(
-            encoder_name=encoder_name)
+        self.unfreeze = unfreeze
+        self.encoder = Encoder_partial_freeze(
+            encoder_name=encoder_name,
+            unfreeze=unfreeze)
         self.emotion_linear = nn.Linear(
             self.encoder.config.hidden_size, n_emotion)
         self.n_expert = n_expert
