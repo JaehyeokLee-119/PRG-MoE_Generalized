@@ -1,7 +1,7 @@
 import logging
 import os
 import datetime
-
+from transformers import get_cosine_schedule_with_warmup
 import torch
 import torch.optim as optim
 from tqdm import tqdm
@@ -26,6 +26,7 @@ class LearningEnv:
         log_directory,
         model_name,
         port,
+        training_iter,
         contain_context,
         data_label,
         **kwargs,
@@ -50,11 +51,14 @@ class LearningEnv:
         self.model_name = model_name
         self.port = port
 
+        self.training_iter = training_iter
         self.split_performance = None
 
         self.data_label = data_label
 
         self.best_performance = [0, 0, 0]  # p, r, f1
+        
+        self.epoch = 1
 
     def __set_model__(
         self,
@@ -295,6 +299,10 @@ class LearningEnv:
                                                 last_epoch=-1,
                                                 verbose=False)
 
+        # scheduler = transformers.get_cosine_schedule_with_warmup(optimizer,
+		#             num_warmup_steps=num_warmup_steps,
+		#             num_training_steps=num_total_steps)
+        
         train_dataloader = self.get_dataloader(
             self.train_dataset, batch_size, num_worker)
 
@@ -361,8 +369,12 @@ class LearningEnv:
 
                 loss_emo = criterion_emo(
                     emotion_prediction, emotion_label_batch.to(allocated_gpu))
-                loss_cau = criterion_cau(
-                    binary_cause_prediction_window, pair_binary_cause_label_batch_window.to(allocated_gpu))
+                
+                if (torch.sum(check_pair_window_idx)==0):       # if there is no 'non-neutral' in the window
+                    loss_cau = torch.tensor(0.0).to(allocated_gpu)
+                else:
+                    loss_cau = criterion_cau(
+                        binary_cause_prediction_window, pair_binary_cause_label_batch_window.to(allocated_gpu))
                 loss = 0.2 * loss_emo + 0.8 * loss_cau
 
                 optimizer.zero_grad()
@@ -384,7 +396,7 @@ class LearningEnv:
             # Logging Performance
             if allocated_gpu == 0:
                 p_cau, r_cau, f1_cau = log_metrics(logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list,
-                                                   cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option='train')
+                                                   cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, epoch=self.epoch, training_iter=self.training_iter, option='train')
             self.valid(allocated_gpu, batch_size, num_worker, saver)
 
             if not self.single_gpu:
@@ -397,6 +409,7 @@ class LearningEnv:
                 return
 
             scheduler.step()
+            self.epoch += 1
 
     def valid(self, allocated_gpu, batch_size, num_worker, saver=None, option='valid'):
         def get_pad_idx(utterance_input_ids_batch):
@@ -520,7 +533,7 @@ class LearningEnv:
 
             if allocated_gpu == 0:
                 p_cau, r_cau, f1_cau = log_metrics(logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list,
-                                                   cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option=option)
+                                                   cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, epoch=self.epoch, training_iter=self.training_iter, option=option)
             del valid_dataloader
 
             if option == 'valid' and allocated_gpu == 0:
