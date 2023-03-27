@@ -26,14 +26,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='This code is for ECPE task.')
 
     # Training Environment
-    parser.add_argument('--gpus', default=[0])
+    parser.add_argument('--gpus', default=[1])
     parser.add_argument('--num_process', default=int(os.cpu_count() * 0.8), type=int)
     parser.add_argument('--num_worker', default=6, type=int)
     parser.add_argument('--port', default=1234, type=int)
 
     parser.add_argument('--model_name', default='PRG_MoE')
-    parser.add_argument('--pretrained_model', default=None)
-    parser.add_argument('--test', default=False)
+    parser.add_argument('--pretrained_model', default='model/j-hartmann_emotion-english-roberta-large, unfreeze(10)--original_fold-lr_5e-06.pt')
+    parser.add_argument('--test', default=True)
 
     parser.add_argument('--split_directory', default=None)
     parser.add_argument('--train_data', default="data/data_fold/data_0/dailydialog_train.json")
@@ -52,7 +52,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--max_seq_len', help='the max length of each tokenized utterance', default=75, type=int)
     parser.add_argument('--contain_context', help='While tokenizing, previous utterances are contained or not', default=False)
 
-    parser.add_argument('--training_iter', default=40, type=int)
+    parser.add_argument('--training_iter', default=15, type=int)
     parser.add_argument('--batch_size', default=5, type=int)
     parser.add_argument('--learning_rate', default=5e-5, type=float)
     parser.add_argument('--patience', help='patience for Early Stopping', default=None, type=int)
@@ -73,52 +73,67 @@ def main():
     set_random_seed(77)
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(_) for _ in args.gpus])
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # ignore TF error message 
+    
+    # train_data_list = [
+    #     'data/data_fold/data_0/dailydialog_train.json',
+    #     * [f'data/data_fold/data_{fold_}/data_{fold_}_train.json' for fold_ in range(1, 5)]
+    # ]
+    # valid_data_list = [
+    #     'data/data_fold/data_0/dailydialog_valid.json',
+    #     * [f'data/data_fold/data_{fold_}/data_{fold_}_valid.json' for fold_ in range(1, 5)]
+    # ]
+    # test_data_list = [
+    #     'data/data_fold/data_0/dailydialog_test.json',
+    #     * [f'data/data_fold/data_{fold_}/data_{fold_}_test.json' for fold_ in range(1, 5)]
+    # ]
+    # data_label = ['-original_data_DailyDialog', *[f'-data_{fold_}_DailyDialog' for fold_ in range(1, 5)]]
+    
+    # Original Dataset (1 fold)
+    train_data_list = ['data/data_fold/data_0/dailydialog_train.json']
+    valid_data_list = ['data/data_fold/data_0/dailydialog_valid.json']
+    test_data_list = ['data/data_fold/data_0/dailydialog_test.json']
+    data_label = ['-original_fold']
+    
+    lrs = [5e-6, 5e-5]
 
-    train_data_list = [
-        'data/data_fold/data_0/dailydialog_train.json',
-        * [f'data/data_fold/data_{fold_}/data_{fold_}_train.json' for fold_ in range(1, 5)]
-    ]
-    valid_data_list = [
-        'data/data_fold/data_0/dailydialog_valid.json',
-        * [f'data/data_fold/data_{fold_}/data_{fold_}_valid.json' for fold_ in range(1, 5)]
-    ]
-    test_data_list = [
-        'data/data_fold/data_0/dailydialog_test.json',
-        * [f'data/data_fold/data_{fold_}/data_{fold_}_test.json' for fold_ in range(1, 5)]
-    ]
-    data_label = ['-original_data_DailyDialog', *[f'-data_{fold_}_DailyDialog' for fold_ in range(1, 5)]]
-
-    model_name_list = ['PRG_MoE']
-    log_directory_list = ['logs/train_PRG_MoE']
-
-    for tr, va, te, dl in zip(train_data_list, valid_data_list, test_data_list, data_label):
-        args.train_data, args.valid_data, args.test_data, args.data_label = tr, va, te, dl
-
-        for mo, log_d in zip(model_name_list, log_directory_list):
-            args.model_name = mo
-            args.log_directory = log_d + dl
-
-            trainer = LearningEnv(**vars(args))
-            trainer.run(**vars(args))
-
-            del trainer
-
-    train_data_list = [f'data_fold_test_IEMOCAP/data_{fold_}/data_{fold_}_train.json' for fold_ in range(0, 5)]
-    valid_data_list = [f'data_fold_test_IEMOCAP/data_{fold_}/data_{fold_}_valid.json' for fold_ in range(0, 5)]
-    test_data_list = [f'data_fold_test_IEMOCAP/data_{fold_}/data_{fold_}_test.json' for fold_ in range(0, 5)]
-    data_label = [f'-data_{fold_}_IEMOCAP' for fold_ in range(0, 5)]
+    model_name_list = ['PRG_MoE_General']
+    log_directory_list = ['logs/train_PRG_MoE_General(bert-base-unfreezed 3)']
 
     for tr, va, te, dl in zip(train_data_list, valid_data_list, test_data_list, data_label):
         args.train_data, args.valid_data, args.test_data, args.data_label = tr, va, te, dl
 
         for mo, log_d in zip(model_name_list, log_directory_list):
-            args.model_name = mo
-            args.log_directory = log_d + dl
+            for lr in lrs:
+                args.learning_rate = lr
+                args.model_name = mo
+                args.log_directory = f'logs/test_(gpu 1개)_({args.pretrained_model[6:-3]})'
+                # args.log_directory = log_d + dl
 
-            trainer = LearningEnv(**vars(args))
-            trainer.run(**vars(args))
+                trainer = LearningEnv(**vars(args))
+                trainer.run(**vars(args))
 
-            del trainer
+                del trainer
+                
+                if (args.test):
+                    break
+
+    # train_data_list = [f'data_fold_test_IEMOCAP/data_{fold_}/data_{fold_}_train.json' for fold_ in range(0, 5)]
+    # valid_data_list = [f'data_fold_test_IEMOCAP/data_{fold_}/data_{fold_}_valid.json' for fold_ in range(0, 5)]
+    # test_data_list = [f'data_fold_test_IEMOCAP/data_{fold_}/data_{fold_}_test.json' for fold_ in range(0, 5)]
+    # data_label = [f'-data_{fold_}_IEMOCAP' for fold_ in range(0, 5)]
+
+    # for tr, va, te, dl in zip(train_data_list, valid_data_list, test_data_list, data_label):
+    #     args.train_data, args.valid_data, args.test_data, args.data_label = tr, va, te, dl
+
+    #     for mo, log_d in zip(model_name_list, log_directory_list):
+    #         args.model_name = mo
+    #         args.log_directory = log_d + dl
+
+    #         trainer = LearningEnv(**vars(args))
+    #         trainer.run(**vars(args))
+
+    #         del trainer
 
 
 if __name__ == "__main__":

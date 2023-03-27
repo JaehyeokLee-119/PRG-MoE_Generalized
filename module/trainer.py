@@ -10,8 +10,10 @@ from torch.utils.data import TensorDataset, DataLoader
 import module.model as M
 from module.evaluation import log_metrics, FocalLoss
 from module.preprocessing import get_data, tokenize_conversation
+from module.model_setting import ENCODER_NAME
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # ignore TF error message 
 
 class LearningEnv:
     def __init__(
@@ -44,9 +46,11 @@ class LearningEnv:
 
         self.start_time = datetime.datetime.now()
         self.log_directory = log_directory
+        self.num_epoch = 1
 
         self.options = kwargs
-
+        self.training_iter = self.options['training_iter']
+        
         self.model_name = model_name
         self.port = port
 
@@ -139,7 +143,7 @@ class LearningEnv:
         dataloader_params = {
             "dataset": dataset_,
             "batch_size": batch_size,
-            "shuffle": shuffle
+            # "shuffle": shuffle
         }
 
         if not self.single_gpu:
@@ -226,7 +230,15 @@ class LearningEnv:
     def train(self, allocated_gpu, training_iter, batch_size, learning_rate, patience, num_worker):
         def get_pad_idx(utterance_input_ids_batch):
             batch_size, max_doc_len, max_seq_len = utterance_input_ids_batch.shape
-            check_pad_idx = torch.sum(utterance_input_ids_batch.view(-1, max_seq_len)[:, 2:], dim=1).cpu()
+            
+            if 'bert-base' in ENCODER_NAME:
+                # BERT 류인 경우
+                check_pad_idx = torch.sum(
+                    utterance_input_ids_batch.view(-1, max_seq_len)[:, 2:], dim=1).cpu()
+            else:
+                # RoBERTa 류인 경우
+                tmp = utterance_input_ids_batch.view(-1, max_seq_len)[:, 2:]-1
+                check_pad_idx = torch.sum(tmp, dim=1).cpu()
 
             return check_pad_idx
 
@@ -263,7 +275,7 @@ class LearningEnv:
 
         if not os.path.exists("model/"):
             os.makedirs("model/")
-        saver = ModelSaver(path=f"model/{self.model_name}-{model_name_suffix}-{self.data_label}-{self.start_time}.pt", single_gpu=self.single_gpu)
+        saver = ModelSaver(path=f"model/{ENCODER_NAME}-{self.data_label}-lr_{learning_rate}.pt", single_gpu=self.single_gpu)
 
         scheduler = optim.lr_scheduler.LambdaLR(optimizer=optimizer,
                                                 lr_lambda=lambda epoch: 0.95 ** epoch,
@@ -324,7 +336,10 @@ class LearningEnv:
                 criterion_cau = FocalLoss(gamma=2)
 
                 loss_emo = criterion_emo(emotion_prediction, emotion_label_batch.to(allocated_gpu))
-                loss_cau = criterion_cau(binary_cause_prediction_window, pair_binary_cause_label_batch_window.to(allocated_gpu))
+                if (torch.sum(check_pair_window_idx)==0):
+                    loss_cau = torch.tensor(0.0).to(allocated_gpu)
+                else:
+                    loss_cau = criterion_cau(binary_cause_prediction_window, pair_binary_cause_label_batch_window.to(allocated_gpu))
                 loss = 0.2 * loss_emo + 0.8 * loss_cau
 
                 optimizer.zero_grad()
@@ -342,6 +357,7 @@ class LearningEnv:
 
             # Logging Performance
             if allocated_gpu == 0:
+                logger.info(f'\nEpoch: [{self.num_epoch}/{training_iter}]')
                 p_cau, r_cau, f1_cau = log_metrics(logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option='train')
             self.valid(allocated_gpu, batch_size, num_worker, saver)
             
@@ -354,12 +370,22 @@ class LearningEnv:
                 return
             
             scheduler.step()
+            if allocated_gpu == 0:
+                self.num_epoch += 1
 
     def valid(self, allocated_gpu, batch_size, num_worker, saver=None, option='valid'):
         def get_pad_idx(utterance_input_ids_batch):
             batch_size, max_doc_len, max_seq_len = utterance_input_ids_batch.shape
-            check_pad_idx = torch.sum(utterance_input_ids_batch.view(-1, max_seq_len)[:, 2:], dim=1).cpu()
-
+            
+            if 'bert-base' in ENCODER_NAME:
+                # BERT 류인 경우
+                check_pad_idx = torch.sum(
+                    utterance_input_ids_batch.view(-1, max_seq_len)[:, 2:], dim=1).cpu()
+            else:
+                # RoBERTa 류인 경우
+                tmp = utterance_input_ids_batch.view(-1, max_seq_len)[:, 2:]-1
+                check_pad_idx = torch.sum(tmp, dim=1).cpu()
+            
             return check_pad_idx
 
         def get_pair_pad_idx(utterance_input_ids_batch, window_constraint=3, emotion_pred=None):
@@ -444,7 +470,10 @@ class LearningEnv:
                 criterion_cau = FocalLoss(gamma=2)
 
                 loss_emo = criterion_emo(emotion_prediction, emotion_label_batch.to(allocated_gpu))
-                loss_cau = criterion_cau(binary_cause_prediction_window, pair_binary_cause_label_batch_window.to(allocated_gpu))
+                if (torch.sum(check_pair_window_idx)==0):
+                    loss_cau = torch.tensor(0.0).to(allocated_gpu)
+                else:
+                    loss_cau = criterion_cau(binary_cause_prediction_window, pair_binary_cause_label_batch_window.to(allocated_gpu))
 
                 loss = 0.2 * loss_emo + 0.8 * loss_cau
 
@@ -458,6 +487,7 @@ class LearningEnv:
             loss_avg = loss_avg / count
 
             if allocated_gpu == 0:
+                logger.info(f'\nEpoch: [{self.num_epoch}/{self.training_iter}]')
                 p_cau, r_cau, f1_cau = log_metrics(logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option=option)
             del valid_dataloader
 

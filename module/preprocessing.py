@@ -1,6 +1,7 @@
 import json
 import torch
-from transformers import BertTokenizer
+from transformers import BertTokenizer, AutoTokenizer
+from module.model_setting import ENCODER_NAME
 
 def get_data(data_file, device, max_seq_len, contain_context=False):
     f = open(data_file)
@@ -95,7 +96,7 @@ def load_utterance(data_file, device, max_seq_len):
     data = json.load(f)
     f.close()
 
-    tokenizer_ = BertTokenizer.from_pretrained('bert-base-cased')
+    tokenizer_ = AutoTokenizer.from_pretrained(ENCODER_NAME)
 
     max_seq_len = max_seq_len
     max_doc_len = 0
@@ -120,10 +121,16 @@ def load_utterance(data_file, device, max_seq_len):
 
         utterance_t = utterance_t + padding_sequence_t # shape: (max_doc_len, max_seq_len)
         utterance_input_ids_t, utterance_attention_mask_t, utterance_token_type_ids_t = [list() for _ in range(3)]
+        
         for _ in utterance_t:
-            utterance_input_ids_t.append(_['input_ids'])
-            utterance_attention_mask_t.append(_['attention_mask'])
-            utterance_token_type_ids_t.append(_['token_type_ids'])
+            if ('token_type_ids' in _.keys()):
+                utterance_input_ids_t.append(_['input_ids'])
+                utterance_attention_mask_t.append(_['attention_mask'])
+                utterance_token_type_ids_t.append(_['token_type_ids'])
+            else: #RoBERTa 류는 token_type_ids 가 없음
+                utterance_input_ids_t.append(_['input_ids'])
+                utterance_attention_mask_t.append(_['attention_mask'])
+                utterance_token_type_ids_t.append(torch.zeros(_['input_ids'].shape).to(torch.int)) # 그 자리에 크기만큼 0으로 채운 텐서 넣음
 
         utterance_input_ids_t = torch.vstack(utterance_input_ids_t)
         utterance_attention_mask_t = torch.vstack(utterance_attention_mask_t)
@@ -156,7 +163,7 @@ def load_utterance_with_context(data_file, device, max_seq_len):
     data = json.load(f)
     f.close()
 
-    tokenizer_ = BertTokenizer.from_pretrained('bert-base-cased')
+    tokenizer_ = AutoTokenizer.from_pretrained(ENCODER_NAME)
 
     max_seq_len = max_seq_len
     max_doc_len = 0
@@ -205,7 +212,7 @@ def load_utterance_with_context(data_file, device, max_seq_len):
     return (out_utterance_input_ids.to(device), out_utterance_attention_mask.to(device), out_utterance_token_type_ids.to(device)), max_doc_len, max_seq_len
 
 def tokenize_conversation(conversation, device, max_seq_len):
-    tokenizer_ = BertTokenizer.from_pretrained('bert-base-cased')
+    tokenizer_ = AutoTokenizer.from_pretrained(ENCODER_NAME)
 
     max_seq_len = max_seq_len
     max_doc_len = 0

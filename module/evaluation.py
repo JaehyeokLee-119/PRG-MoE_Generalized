@@ -64,11 +64,18 @@ def log_metrics(logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_t
         label_ = np.array(['No Cause', 'Cause'])
 
         report_dict = metrics_report(torch.cat(cau_pred_y_list), torch.cat(cau_true_y_list), label=label_, get_dict=True)
-        _, p_cau, _, _ = report_dict['accuracy'], report_dict['Cause']['precision'], report_dict['Cause']['recall'], report_dict['Cause']['f1-score']
 
+        if 'Cause' in report_dict.keys():   #추가된 부분
+            _, p_cau, _, _ = report_dict['accuracy'], report_dict['Cause']['precision'], report_dict['Cause']['recall'], report_dict['Cause']['f1-score']
+        else:   #추가된 부분
+            _, p_cau, _, _ = 0, 0, 0, 0   #추가된 부분
+            
         report_dict = metrics_report(torch.cat(cau_pred_y_list_all), torch.cat(cau_true_y_list_all), label=label_, get_dict=True)
-        acc_cau, _, r_cau, _ = report_dict['accuracy'], report_dict['Cause']['precision'], report_dict['Cause']['recall'], report_dict['Cause']['f1-score']
-
+        if 'Cause' in report_dict.keys():   #추가된 부분
+            acc_cau, _, r_cau, _ = report_dict['accuracy'], report_dict['Cause']['precision'], report_dict['Cause']['recall'], report_dict['Cause']['f1-score']
+        else:   #추가된 부분
+            acc_cau, _, r_cau, _ = 0, 0, 0, 0   #추가된 부분
+            
         f1_cau = 2 * p_cau * r_cau / (p_cau + r_cau) if p_cau + r_cau != 0 else 0
         logger.info(f'\nbinary_cause: {option} | loss {loss_avg}\n')
         logger.info(f'\nbinary_cause: accuracy: {acc_cau} | precision: {p_cau} | recall: {r_cau} | f1-score: {f1_cau}\n')
