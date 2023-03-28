@@ -26,13 +26,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='This code is for ECPE task.')
 
     # Training Environment
-    parser.add_argument('--gpus', default=[1])
+    parser.add_argument('--gpus', default=[2,3])
     parser.add_argument('--num_process', default=int(os.cpu_count() * 0.8), type=int)
     parser.add_argument('--num_worker', default=6, type=int)
-    parser.add_argument('--port', default=1234, type=int)
+    parser.add_argument('--port', default=1236, type=int)
 
     parser.add_argument('--model_name', default='PRG_MoE')
-    parser.add_argument('--pretrained_model', default='model/j-hartmann_emotion-english-roberta-large, unfreeze(10)--original_fold-lr_5e-06.pt')
+    parser.add_argument('--pretrained_model', default='model/bert-base-cased-unfreezed-original_fold-lr_5e-06.pt')
     parser.add_argument('--test', default=True)
 
     parser.add_argument('--split_directory', default=None)
@@ -89,13 +89,19 @@ def main():
     # ]
     # data_label = ['-original_data_DailyDialog', *[f'-data_{fold_}_DailyDialog' for fold_ in range(1, 5)]]
     
-    # Original Dataset (1 fold)
-    train_data_list = ['data/data_fold/data_0/dailydialog_train.json']
-    valid_data_list = ['data/data_fold/data_0/dailydialog_valid.json']
-    test_data_list = ['data/data_fold/data_0/dailydialog_test.json']
-    data_label = ['-original_fold']
+    # # Original Dataset (1 fold)
+    # train_data_list = ['data/data_fold/data_0/dailydialog_train.json']
+    # valid_data_list = ['data/data_fold/data_0/dailydialog_valid.json']
+    # test_data_list = ['data/data_fold/data_0/dailydialog_test.json']
+    # data_label = ['-original_fold']
     
-    lrs = [5e-6, 5e-5]
+    # Mini Dataset (1 fold)
+    train_data_list = ['data/data_mini/dailydialog_train.json']
+    valid_data_list = ['data/data_mini/dailydialog_valid.json']
+    test_data_list = ['data/data_mini/dailydialog_test.json']
+    data_label = ['-original_mini']
+    
+    lrs = [5e-5]
 
     model_name_list = ['PRG_MoE_General']
     log_directory_list = ['logs/train_PRG_MoE_General(bert-base-unfreezed 3)']
@@ -107,7 +113,7 @@ def main():
             for lr in lrs:
                 args.learning_rate = lr
                 args.model_name = mo
-                args.log_directory = f'logs/test_(gpu 1개)_({args.pretrained_model[6:-3]})'
+                args.log_directory = f'logs/Debugging_test_(gpu 1개)'#_({args.pretrained_model[6:-3]})'
                 # args.log_directory = log_d + dl
 
                 trainer = LearningEnv(**vars(args))

@@ -6,6 +6,7 @@ import torch
 import torch.optim as optim
 from tqdm import tqdm
 from torch.utils.data import TensorDataset, DataLoader
+import torch.distributed as dist
 
 import module.model as M
 from module.evaluation import log_metrics, FocalLoss
@@ -288,8 +289,8 @@ class LearningEnv:
             self.distributed_model.train()
             
             loss_avg, count= 0, 0
-            emo_pred_y_list, emo_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, cau_pred_y_list, cau_true_y_list = [list() for _ in range(6)]
-
+            emo_pred_y_list, emo_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, cau_pred_y_list, cau_true_y_list = [list() for _ in range(6)]            
+            
             for utterance_input_ids_batch, utterance_attention_mask_batch, utterance_token_type_ids_batch, speaker_batch, emotion_label_batch, pair_cause_label_batch, pair_binary_cause_label_batch in tqdm(train_dataloader, desc=f"Train | Epoch {i+1}"):
                 batch_size, max_doc_len, max_seq_len = utterance_input_ids_batch.shape
                 
