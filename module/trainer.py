@@ -492,8 +492,11 @@ class LearningEnv:
             del valid_dataloader
 
             if option == 'valid' and allocated_gpu == 0:
-                saver(self.distributed_model)
-
+                f1_cau = 2 * p_cau * r_cau / (p_cau + r_cau) if p_cau + r_cau != 0 else 0
+                if self.best_performance[-1] < f1_cau:
+                    saver(self.distributed_model) # save model when best performance
+                    
+                # saver(self.distributed_model) # save model every epoch
                 return 0
             
             if option == 'test' and allocated_gpu == 0:
