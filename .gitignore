@@ -3,3 +3,5 @@ model/*
 module/__*
 
 temporary
+
+.env

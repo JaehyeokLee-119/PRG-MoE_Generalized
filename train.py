@@ -4,11 +4,16 @@ import os
 import random
 import csv
 from typing import List
+import telegram
 
 import numpy as np
 import torch
+import asyncio
+
 
 from module.trainer import LearningEnv
+from module.model_setting import ENCODER_NAME, UNFREEZE
+from dotenv import load_dotenv
 
 
 def set_random_seed(seed: int):
@@ -26,13 +31,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='This code is for ECPE task.')
 
     # Training Environment
-    parser.add_argument('--gpus', default=[1])
+    parser.add_argument('--gpus', default=[0,1])
     parser.add_argument('--num_process', default=int(os.cpu_count() * 0.8), type=int)
     parser.add_argument('--num_worker', default=6, type=int)
     parser.add_argument('--port', default=1234, type=int)
 
     parser.add_argument('--model_name', default='PRG_MoE')
-    parser.add_argument('--pretrained_model', default='model/bert-base-cased-unfreezed-original_fold-lr_5e-06.pt')
+    parser.add_argument('--pretrained_model', default='model/j-hartmann_emotion-english-roberta-large, unfreeze(10)--original_fold-lr_5e-06.pt')
     parser.add_argument('--test', default=True)
 
     parser.add_argument('--split_directory', default=None)
@@ -66,8 +71,8 @@ def test_preconditions(args: argparse.Namespace):
 
 
 def main():
+    load_dotenv()
     args = parse_args()
-
     test_preconditions(args)
 
     set_random_seed(77)
@@ -95,26 +100,49 @@ def main():
     # test_data_list = ['data/data_fold/data_0/dailydialog_test.json']
     # data_label = ['-original_fold']
     
-    # Mini Dataset (1 fold)
-    train_data_list = ['data/data_mini/dailydialog_train.json']
-    valid_data_list = ['data/data_mini/dailydialog_valid.json']
-    test_data_list = ['data/data_mini/dailydialog_test.json']
-    data_label = ['-original_mini']
+    # Another folds
+    train_data_list = [
+        * [f'data/data_fold/data_{fold_}/data_{fold_}_train.json' for fold_ in range(1, 5)]
+    ]
+    valid_data_list = [
+        * [f'data/data_fold/data_{fold_}/data_{fold_}_valid.json' for fold_ in range(1, 5)]
+    ]
+    test_data_list = [
+        * [f'data/data_fold/data_{fold_}/data_{fold_}_test.json' for fold_ in range(1, 5)]
+    ]
+    data_label = [* [f'-data_{fold_}_DailyDialog' for fold_ in range(1, 5)]]
+    
+    # # Mini Dataset (1 fold)
+    # train_data_list = ['data/data_mini/dailydialog_train.json']
+    # valid_data_list = ['data/data_mini/dailydialog_valid.json']
+    # test_data_list = ['data/data_mini/dailydialog_test.json']
+    # data_label = ['-original_mini']
+    
+    # 텔레그램 봇 설정
+    BOT_TOKEN = os.getenv('BOT_TOKEN')
+    CHAT_ID = os.getenv('CHAT_ID')
+    bot = telegram.Bot(token=BOT_TOKEN)
+    chat_id = CHAT_ID
     
     lrs = [5e-5]
 
     model_name_list = ['PRG_MoE_General']
     log_directory_list = ['logs/train_PRG_MoE_General(bert-base-unfreezed 3)']
+    
+    encoder_name = ENCODER_NAME.replace('/', '_')
 
     for tr, va, te, dl in zip(train_data_list, valid_data_list, test_data_list, data_label):
         args.train_data, args.valid_data, args.test_data, args.data_label = tr, va, te, dl
 
         for mo, log_d in zip(model_name_list, log_directory_list):
             for lr in lrs:
+                # 학습 시작 알림
+                asyncio.run(bot.sendMessage(chat_id=chat_id, text=f'Training Start!\ntrain_{lr}_{encoder_name}, Unfreze{UNFREEZE}\ndata: {dl}'))
+                
                 args.learning_rate = lr
                 args.model_name = mo
-                args.log_directory = f'logs/new_metric_test_Debugging_test_(gpu 1개)'#_({args.pretrained_model[6:-3]})'
-                # args.log_directory = log_d + dl
+                args.log_directory = f'logs/train_{lr}_{encoder_name}, Unfreze{UNFREEZE}'#_({args.pretrained_model[6:-3]})'
+                args.log_directory = log_d + dl
 
                 trainer = LearningEnv(**vars(args))
                 trainer.run(**vars(args))
@@ -123,7 +151,10 @@ def main():
                 
                 if (args.test):
                     break
-
+            
+                # 현재 설정의 학습 완료를 알림
+                asyncio.run(bot.sendMessage(chat_id=chat_id, text=f'Training is done!\ntrain_{lr}_{encoder_name}, Unfreze{UNFREEZE}\ndata: {dl}'))
+    
     # train_data_list = [f'data_fold_test_IEMOCAP/data_{fold_}/data_{fold_}_train.json' for fold_ in range(0, 5)]
     # valid_data_list = [f'data_fold_test_IEMOCAP/data_{fold_}/data_{fold_}_valid.json' for fold_ in range(0, 5)]
     # test_data_list = [f'data_fold_test_IEMOCAP/data_{fold_}/data_{fold_}_test.json' for fold_ in range(0, 5)]

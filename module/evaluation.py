@@ -49,7 +49,14 @@ def metrics_report_for_emo_binary(pred_y, true_y, get_dict=False, multilabel=Fal
         return classification_report(true_y, pred_y, target_names=class_name, zero_division=0, digits=4)
 
 
-
+def logs_for_emo_cause(logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all):
+    emo_pred_cat = torch.cat(emo_pred_y_list)
+    emo_true_cat = torch.cat(emo_true_y_list)
+    cau_pred_cat = torch.cat(cau_pred_y_list)
+    cau_true_cat = torch.cat(cau_true_y_list)
+    cau_pred_all_cat = torch.cat(cau_pred_y_list_all)
+    cau_true_all_cat = torch.cat(cau_true_y_list_all)
+    
 
 
 

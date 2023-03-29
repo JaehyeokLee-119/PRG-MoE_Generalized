@@ -9,7 +9,7 @@ from torch.utils.data import TensorDataset, DataLoader
 import torch.distributed as dist
 
 import module.model as M
-from module.evaluation import log_metrics, FocalLoss
+from module.evaluation import log_metrics, FocalLoss, logs_for_emo_cause
 from module.preprocessing import get_data, tokenize_conversation
 from module.model_setting import ENCODER_NAME
 
@@ -463,7 +463,6 @@ class LearningEnv:
                                                     window_constraint=1000
                                                     )
 
-            
                 '''
                 준비물 정리:
                     emotion_prediction
@@ -473,95 +472,96 @@ class LearningEnv:
                     check_pair_window_idx
                     check_pair_pad_idx
                 '''
-
-                # 1번 과정: model emotion prediction을 [5, 26, 7] -> [5, 351]로 만듦
-                emotion_list = emotion_prediction.view(batch_size, -1, 7)
-                    # emotion: [130,7] -> [5, 26, 7]
-                emotion_pair_list = []      # pair 형태[5,351]로 감정 예측을 저장
-                emotion_pred_list = []      # utterance 단위[5,26]로 감정 예측을 저장
                 
-                for doc_emotion in emotion_list: # 전체 batch에서 각 doc(대화)을 가져옴
-                    end_t = 0
-                    for utt_emotion in doc_emotion: # 각 대화마다 utterance 가져옴
-                        emotion_pred_list.append(torch.argmax(utt_emotion))
-                        for _ in range(end_t+1): # 
-                            emotion_pair_list.append(torch.argmax(utt_emotion)) # 모델의 감정 예측을 index[7->1]화
-                        end_t += 1
+                
+                # # 1번 과정: model emotion prediction을 [5, 26, 7] -> [5, 351]로 만듦
+                # emotion_list = emotion_prediction.view(batch_size, -1, 7)
+                #     # emotion: [130,7] -> [5, 26, 7]
+                # emotion_pair_list = []      # pair 형태[5,351]로 감정 예측을 저장
+                # emotion_pred_list = []      # utterance 단위[5,26]로 감정 예측을 저장
+                
+                # for doc_emotion in emotion_list: # 전체 batch에서 각 doc(대화)을 가져옴
+                #     end_t = 0
+                #     for utt_emotion in doc_emotion: # 각 대화마다 utterance 가져옴
+                #         emotion_pred_list.append(torch.argmax(utt_emotion))
+                #         for _ in range(end_t+1): # 
+                #             emotion_pair_list.append(torch.argmax(utt_emotion)) # 모델의 감정 예측을 index[7->1]화
+                #         end_t += 1
+                
+                # emotion_pair_pred_expanded = torch.stack(emotion_pair_list).view(batch_size, -1)
+                # emotion_pred_tensor = torch.stack(emotion_pred_list).view(batch_size, -1)
+                #     # emotion_list를 [5, 26] -> [5, 351]로 만들기 (emotion_pair_pred_expanded)
+                
+                # # 2번 과정
+                # binary_cause_pred_window_full = torch.argmax(binary_cause_prediction.view(batch_size, -1, self.n_cause), dim=-1)
+                #     # cause: [1755,2] -> [5, 351, 2] -> [5, 351]
+                
+                # # 3번 과정: label(정답)의 모양을 [5, 351]로 맞추기 
+                # # 3-1) emotion label(true)을 [5, 351]로 만들기
+                # emotion_label_pair_list = [] 
+                # for doc_emotion in emotion_label_batch:
+                #     end_t = 0
+                #     for emotion in doc_emotion:
+                #         for _ in range(end_t+1):
+                #             emotion_label_pair_list.append(emotion)
+                #         end_t += 1
+                # emotion_pair_true_expanded = torch.stack(emotion_label_pair_list).view(batch_size, -1)
                         
-                emotion_pair_pred_expanded = torch.stack(emotion_pair_list).view(batch_size, -1)
-                emotion_pred_tensor = torch.stack(emotion_pred_list).view(batch_size, -1)
-                    # emotion_list를 [5, 26] -> [5, 351]로 만들기 (emotion_pair_pred_expanded)
+                # # 3-2) pair label(true)을 [5, 351]로 가져오기
+                # pair_label_full = pair_binary_cause_label_batch
                 
-                # 2번 과정
-                binary_cause_pred_window_full = torch.argmax(binary_cause_prediction.view(batch_size, -1, self.n_cause), dim=-1)
-                    # cause: [1755,2] -> [5, 351, 2] -> [5, 351]
+                # # 4번) pair 단위로 emotion, pair 정답 여부를 저장 [5, 351]
+                # # 4-1) emotion 정답 여부를 저장
+                # emotion_correct = emotion_pair_pred_expanded == emotion_pair_true_expanded
+                # emotion_correct_windowed = emotion_correct[(check_pair_window_idx != False).nonzero(as_tuple=True)] # emotion이 정답인 pair들은 True, 아니면 False
+                # emotion_correct_all_pad = emotion_correct[(check_pair_pad_idx != False).nonzero(as_tuple=True)] # emotion이 정답인 pair들은 True, 아니면 False
                 
-                # 3번 과정: label(정답)의 모양을 [5, 351]로 맞추기 
-                # 3-1) emotion label(true)을 [5, 351]로 만들기
-                emotion_label_pair_list = [] 
-                for doc_emotion in emotion_label_batch:
-                    end_t = 0
-                    for emotion in doc_emotion:
-                        for _ in range(end_t+1):
-                            emotion_label_pair_list.append(emotion)
-                        end_t += 1
-                emotion_pair_true_expanded = torch.stack(emotion_label_pair_list).view(batch_size, -1)
-                        
-                # 3-2) pair label(true)을 [5, 351]로 가져오기
-                pair_label_full = pair_binary_cause_label_batch
+                # # 4-2) pair 정답 여부를 저장
+                # pair_correct = binary_cause_pred_window_full == pair_label_full
                 
-                # 4번) pair 단위로 emotion, pair 정답 여부를 저장 [5, 351]
-                # 4-1) emotion 정답 여부를 저장
-                emotion_correct = emotion_pair_pred_expanded == emotion_pair_true_expanded
-                emotion_correct_windowed = emotion_correct[(check_pair_window_idx != False).nonzero(as_tuple=True)] # emotion이 정답인 pair들은 True, 아니면 False
-                emotion_correct_all_pad = emotion_correct[(check_pair_pad_idx != False).nonzero(as_tuple=True)] # emotion이 정답인 pair들은 True, 아니면 False
+                # # pair_correct는 맞춘 것들
+                # # pair_correct 중에서 true_pair인 것들만 골라낸다 
+                # pair_correct_among_truepair = pair_correct[(pair_label_full == 1)]
+                # emotion_correct_among_truepair = emotion_correct[(pair_label_full == 1)]
                 
-                # 4-2) pair 정답 여부를 저장
-                pair_correct = binary_cause_pred_window_full == pair_label_full
+                # num_emo_x_pair_o_among_truepair = ((pair_correct_among_truepair == True) & (emotion_correct_among_truepair == False)) 
                 
-                # pair_correct는 맞춘 것들
-                # pair_correct 중에서 true_pair인 것들만 골라낸다 
-                pair_correct_among_truepair = pair_correct[(pair_label_full == 1)]
-                emotion_correct_among_truepair = emotion_correct[(pair_label_full == 1)]
+                # pair_correct_windowed = pair_correct[(check_pair_window_idx != False).nonzero(as_tuple=True)] # pair가 정답인 pair들은 True, 아니면 False
+                # pair_correct_all_pad = pair_correct[(check_pair_pad_idx != False).nonzero(as_tuple=True)] # pair가 정답인 pair들은 True, 아니면 False
                 
-                num_emo_x_pair_o_among_truepair = ((pair_correct_among_truepair == True) & (emotion_correct_among_truepair == False)) 
+                # # 4-3) emotion 유사정답(긍정, 부정이 같은 경우) 여부를 저장 (이건 어떻게 분류할지 너무 애매하니까 나중에 하거나 하지 말자)
                 
-                pair_correct_windowed = pair_correct[(check_pair_window_idx != False).nonzero(as_tuple=True)] # pair가 정답인 pair들은 True, 아니면 False
-                pair_correct_all_pad = pair_correct[(check_pair_pad_idx != False).nonzero(as_tuple=True)] # pair가 정답인 pair들은 True, 아니면 False
-                
-                # 4-3) emotion 유사정답(긍정, 부정이 같은 경우) 여부를 저장 (이건 어떻게 분류할지 너무 애매하니까 나중에 하거나 하지 말자)
-                
-                정리='''
-                    # 1: emotion_pred_tensor: 감정 예측 결과 (utterance 단위로 가공)
-                    # 0: 
-                    1: emotion_pair_pred_expanded: 감정 예측 결과 (utterance pair 단위로 가공)
-                    2: binary_cause_pred_window_full: pair 예측 결과 (utterance pair 단위로 가공)
-                    3: emotion_pair_true_expanded: 감정 라벨 정답 (utterance pair 단위로 가공)
-                    3: pair_label_full: pair 라벨 정답 (utterance pair 단위로 가공)
+                # 정리='''
+                #     # 1: emotion_pred_tensor: 감정 예측 결과 (utterance 단위로 가공)
+                #     # 0: 
+                #     1: emotion_pair_pred_expanded: 감정 예측 결과 (utterance pair 단위로 가공)
+                #     2: binary_cause_pred_window_full: pair 예측 결과 (utterance pair 단위로 가공)
+                #     3: emotion_pair_true_expanded: 감정 라벨 정답 (utterance pair 단위로 가공)
+                #     3: pair_label_full: pair 라벨 정답 (utterance pair 단위로 가공)
                     
-                    4: emotion_correct_windowed: predicted emotion에서 나온 window 기준으로 emotion 맞춘 여부
-                    4: emotion_correct_all_pad: 각 대화 utterance 길이 기준으로, 가능한 모든 window 기준 emotion 맞춘 여부
-                    4: pair_correct_windowed:  predicted emotion에서 나온 window 기준으로 pair 맞춘 여부
-                    4: pair_correct_all_pad: 각 대화 utterance 길이 기준으로, 가능한 모든 window 기준 pair 맞춘 여부
-                '''
-                # 5-0) 위 정답 여부 추출 과정이 잘 이루어졌는지 원래 입력들을 확인해서 검증해보기
-                # 원래 문장과 그 cause의 쌍, predicted emotion과 true emotion를 정리 
-                # check_pair_window_idx: emotion 예측 기준, window이 되는 발화를 1로 표시 (emotion prediction 기반)
-                # check_pair_pad_idx: window에 포함될 수 있는 모든 발화를 1로 표시 
-                # 5번) emotion, pair의 정답 여부를 비교하고 추려서 통계값으로 만든다 (predicted window 기준)
-                num_emo_x_pair_o = ((emotion_correct_windowed==False) & (pair_correct_windowed==True)).count_nonzero().item() # : 16
-                num_emo_o_pair_o = (emotion_correct_windowed & pair_correct_windowed).count_nonzero().item() # : 28
-                num_emo_x_pair_x = ((emotion_correct_windowed==False) & (pair_correct_windowed==False)).count_nonzero().item()
-                num_emo_o_pair_x = ((emotion_correct_windowed==True) & (pair_correct_windowed==False)).count_nonzero().item()
+                #     4: emotion_correct_windowed: predicted emotion에서 나온 window 기준으로 emotion 맞춘 여부
+                #     4: emotion_correct_all_pad: 각 대화 utterance 길이 기준으로, 가능한 모든 window 기준 emotion 맞춘 여부
+                #     4: pair_correct_windowed:  predicted emotion에서 나온 window 기준으로 pair 맞춘 여부
+                #     4: pair_correct_all_pad: 각 대화 utterance 길이 기준으로, 가능한 모든 window 기준 pair 맞춘 여부
+                # '''
+                # # 5-0) 위 정답 여부 추출 과정이 잘 이루어졌는지 원래 입력들을 확인해서 검증해보기
+                # # 원래 문장과 그 cause의 쌍, predicted emotion과 true emotion를 정리 
+                # # check_pair_window_idx: emotion 예측 기준, window이 되는 발화를 1로 표시 (emotion prediction 기반)
+                # # check_pair_pad_idx: window에 포함될 수 있는 모든 발화를 1로 표시 
+                # # 5번) emotion, pair의 정답 여부를 비교하고 추려서 통계값으로 만든다 (predicted window 기준)
+                # num_emo_x_pair_o = ((emotion_correct_windowed==False) & (pair_correct_windowed==True)).count_nonzero().item() # : 16
+                # num_emo_o_pair_o = (emotion_correct_windowed & pair_correct_windowed).count_nonzero().item() # : 28
+                # num_emo_x_pair_x = ((emotion_correct_windowed==False) & (pair_correct_windowed==False)).count_nonzero().item()
+                # num_emo_o_pair_x = ((emotion_correct_windowed==True) & (pair_correct_windowed==False)).count_nonzero().item()
                 
-                cnt_entire_pair_candidate += len(pair_correct_windowed)              # 5-0) 분류한 emotion에 근거해서, window에 속하므로 정답 pair의 후보가 될 수 있는 utterance pair 개수
-                cnt_correct_pairs += pair_correct_windowed.count_nonzero().item()    # 5-0) 맞춘 pair의 개수 (T인지 F인지)
-                cnt_emo_x_pair_o += num_emo_x_pair_o
-                cnt_cmo_o_pair_o += num_emo_o_pair_o
-                cnt_emo_x_pair_x += num_emo_x_pair_x
-                cnt_cmo_o_pair_x += num_emo_o_pair_x
-                # 여기까지
-
+                # cnt_entire_pair_candidate += len(pair_correct_windowed)              # 5-0) 분류한 emotion에 근거해서, window에 속하므로 정답 pair의 후보가 될 수 있는 utterance pair 개수
+                # cnt_correct_pairs += pair_correct_windowed.count_nonzero().item()    # 5-0) 맞춘 pair의 개수 (T인지 F인지)
+                # cnt_emo_x_pair_o += num_emo_x_pair_o
+                # cnt_cmo_o_pair_o += num_emo_o_pair_o
+                # cnt_emo_x_pair_x += num_emo_x_pair_x
+                # cnt_cmo_o_pair_x += num_emo_o_pair_x
+                # # 여기까지
+                
 
                 emotion_prediction = emotion_prediction[(check_pad_idx != False).nonzero(as_tuple=True)]
                 binary_cause_prediction_window = binary_cause_prediction.view(batch_size, -1, self.n_cause)[(check_pair_window_idx != False).nonzero(as_tuple=True)]
@@ -601,15 +601,17 @@ class LearningEnv:
             if allocated_gpu == 0:
                 logger.info(f'\nEpoch: [{self.num_epoch}/{self.training_iter}]')
                 p_cau, r_cau, f1_cau = log_metrics(logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option=option)
-            
-                # pair 유효성 검증
-                logger.info(f"\n[Pair emotion validation] Entire pair candidates: {cnt_entire_pair_candidate}\n"+
-                    f"Number of correct pairs: {cnt_correct_pairs}\n"+
-                    f"Number of emotion x pair o: {cnt_emo_x_pair_o}\n"+
-                    f"Number of emotion o pair o: {cnt_cmo_o_pair_o}\n"+
-                    f"Number of emotion x pair x: {cnt_emo_x_pair_x}\n"+
-                    f"Number of emotion o pair x: {cnt_cmo_o_pair_x}"
-                    )
+
+                # logs_for_emo_cause(logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all)
+                
+                # # pair 유효성 검증
+                # logger.info(f"\n[Pair emotion validation] Entire pair candidates: {cnt_entire_pair_candidate}\n"+
+                #     f"Number of correct pairs: {cnt_correct_pairs}\n"+
+                #     f"Number of emotion x pair o: {cnt_emo_x_pair_o}\n"+
+                #     f"Number of emotion o pair o: {cnt_cmo_o_pair_o}\n"+
+                #     f"Number of emotion x pair x: {cnt_emo_x_pair_x}\n"+
+                #     f"Number of emotion o pair x: {cnt_cmo_o_pair_x}"
+                #     )
                 
             
             
