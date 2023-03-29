@@ -31,14 +31,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='This code is for ECPE task.')
 
     # Training Environment
-    parser.add_argument('--gpus', default=[0,1])
+    parser.add_argument('--gpus', default=[0,1,2])
     parser.add_argument('--num_process', default=int(os.cpu_count() * 0.8), type=int)
     parser.add_argument('--num_worker', default=6, type=int)
     parser.add_argument('--port', default=1234, type=int)
 
     parser.add_argument('--model_name', default='PRG_MoE')
-    parser.add_argument('--pretrained_model', default='model/j-hartmann_emotion-english-roberta-large, unfreeze(10)--original_fold-lr_5e-06.pt')
-    parser.add_argument('--test', default=True)
+    parser.add_argument('--pretrained_model', default=None)
+    parser.add_argument('--test', default=False)
 
     parser.add_argument('--split_directory', default=None)
     parser.add_argument('--train_data', default="data/data_fold/data_0/dailydialog_train.json")
@@ -100,23 +100,23 @@ def main():
     # test_data_list = ['data/data_fold/data_0/dailydialog_test.json']
     # data_label = ['-original_fold']
     
-    # Another folds
-    train_data_list = [
-        * [f'data/data_fold/data_{fold_}/data_{fold_}_train.json' for fold_ in range(1, 5)]
-    ]
-    valid_data_list = [
-        * [f'data/data_fold/data_{fold_}/data_{fold_}_valid.json' for fold_ in range(1, 5)]
-    ]
-    test_data_list = [
-        * [f'data/data_fold/data_{fold_}/data_{fold_}_test.json' for fold_ in range(1, 5)]
-    ]
-    data_label = [* [f'-data_{fold_}_DailyDialog' for fold_ in range(1, 5)]]
+    # # Another folds
+    # train_data_list = [
+    #     * [f'data/data_fold/data_{fold_}/data_{fold_}_train.json' for fold_ in range(1, 5)]
+    # ]
+    # valid_data_list = [
+    #     * [f'data/data_fold/data_{fold_}/data_{fold_}_valid.json' for fold_ in range(1, 5)]
+    # ]
+    # test_data_list = [
+    #     * [f'data/data_fold/data_{fold_}/data_{fold_}_test.json' for fold_ in range(1, 5)]
+    # ]
+    # data_label = [* [f'-data_{fold_}_DailyDialog' for fold_ in range(1, 5)]]
     
-    # # Mini Dataset (1 fold)
-    # train_data_list = ['data/data_mini/dailydialog_train.json']
-    # valid_data_list = ['data/data_mini/dailydialog_valid.json']
-    # test_data_list = ['data/data_mini/dailydialog_test.json']
-    # data_label = ['-original_mini']
+    # Mini Dataset (1 fold)
+    train_data_list = ['data/data_mini/dailydialog_train.json']
+    valid_data_list = ['data/data_mini/dailydialog_valid.json']
+    test_data_list = ['data/data_mini/dailydialog_test.json']
+    data_label = ['-original_mini']
     
     # 텔레그램 봇 설정
     BOT_TOKEN = os.getenv('BOT_TOKEN')
@@ -142,7 +142,7 @@ def main():
                 args.learning_rate = lr
                 args.model_name = mo
                 args.log_directory = f'logs/train_{lr}_{encoder_name}, Unfreze{UNFREEZE}'#_({args.pretrained_model[6:-3]})'
-                args.log_directory = log_d + dl
+                # args.log_directory = log_d + dl
 
                 trainer = LearningEnv(**vars(args))
                 trainer.run(**vars(args))

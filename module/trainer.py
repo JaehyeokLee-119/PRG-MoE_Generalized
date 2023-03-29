@@ -277,7 +277,9 @@ class LearningEnv:
 
         if not os.path.exists("model/"):
             os.makedirs("model/")
-        saver = ModelSaver(path=f"model/{ENCODER_NAME}-{self.data_label}-lr_{learning_rate}.pt", single_gpu=self.single_gpu)
+        
+        encoder_name = ENCODER_NAME.replace('/', '_')
+        saver = ModelSaver(path=f"model/{encoder_name}-{self.data_label}-lr_{learning_rate}.pt", single_gpu=self.single_gpu)
 
         scheduler = optim.lr_scheduler.LambdaLR(optimizer=optimizer,
                                                 lr_lambda=lambda epoch: 0.95 ** epoch,
@@ -427,13 +429,13 @@ class LearningEnv:
             loss_avg, count= 0, 0
             emo_pred_y_list, emo_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, cau_pred_y_list, cau_true_y_list = [list() for _ in range(6)]
 
-            # For Emotion-Cause Entire Pair Evaluation
-            cnt_entire_pair_candidate = 0           # len(pair_correct_windowed) # : 52
-            cnt_correct_pairs = 0                   # pair_correct_windowed.count_nonzero().item() # : 44
-            cnt_emo_x_pair_o = 0
-            cnt_cmo_o_pair_o = 0
-            cnt_emo_x_pair_x = 0
-            cnt_cmo_o_pair_x = 0
+            # # For Emotion-Cause Entire Pair Evaluation
+            # cnt_entire_pair_candidate = 0           # len(pair_correct_windowed) # : 52
+            # cnt_correct_pairs = 0                   # pair_correct_windowed.count_nonzero().item() # : 44
+            # cnt_emo_x_pair_o = 0
+            # cnt_cmo_o_pair_o = 0
+            # cnt_emo_x_pair_x = 0
+            # cnt_cmo_o_pair_x = 0
 
 
             for utterance_input_ids_batch, utterance_attention_mask_batch, utterance_token_type_ids_batch, speaker_batch, emotion_label_batch, pair_cause_label_batch, pair_binary_cause_label_batch in tqdm(valid_dataloader, desc=f"{option}"):
@@ -463,15 +465,15 @@ class LearningEnv:
                                                     window_constraint=1000
                                                     )
 
-                '''
-                준비물 정리:
-                    emotion_prediction
-                    binary_cause_prediction
-                    emotion_label_batch
-                    pair_binary_cause_label_batch
-                    check_pair_window_idx
-                    check_pair_pad_idx
-                '''
+                # '''
+                # 준비물 정리:
+                #     emotion_prediction
+                #     binary_cause_prediction
+                #     emotion_label_batch
+                #     pair_binary_cause_label_batch
+                #     check_pair_window_idx
+                #     check_pair_pad_idx
+                # '''
                 
                 
                 # # 1번 과정: model emotion prediction을 [5, 26, 7] -> [5, 351]로 만듦
@@ -613,8 +615,6 @@ class LearningEnv:
                 #     f"Number of emotion o pair x: {cnt_cmo_o_pair_x}"
                 #     )
                 
-            
-            
             del valid_dataloader
 
             if option == 'valid' and allocated_gpu == 0:
