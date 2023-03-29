@@ -48,6 +48,11 @@ def metrics_report_for_emo_binary(pred_y, true_y, get_dict=False, multilabel=Fal
     else:
         return classification_report(true_y, pred_y, target_names=class_name, zero_division=0, digits=4)
 
+
+
+
+
+
 def log_metrics(logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause, option='train'):
     label_ = np.array(['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral'])
     logger.info('\n' + metrics_report(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), label=label_))

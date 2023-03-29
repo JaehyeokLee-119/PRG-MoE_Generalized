@@ -26,10 +26,10 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='This code is for ECPE task.')
 
     # Training Environment
-    parser.add_argument('--gpus', default=[2,3])
+    parser.add_argument('--gpus', default=[1])
     parser.add_argument('--num_process', default=int(os.cpu_count() * 0.8), type=int)
     parser.add_argument('--num_worker', default=6, type=int)
-    parser.add_argument('--port', default=1236, type=int)
+    parser.add_argument('--port', default=1234, type=int)
 
     parser.add_argument('--model_name', default='PRG_MoE')
     parser.add_argument('--pretrained_model', default='model/bert-base-cased-unfreezed-original_fold-lr_5e-06.pt')
@@ -113,7 +113,7 @@ def main():
             for lr in lrs:
                 args.learning_rate = lr
                 args.model_name = mo
-                args.log_directory = f'logs/Debugging_test_(gpu 1개)'#_({args.pretrained_model[6:-3]})'
+                args.log_directory = f'logs/new_metric_test_Debugging_test_(gpu 1개)'#_({args.pretrained_model[6:-3]})'
                 # args.log_directory = log_d + dl
 
                 trainer = LearningEnv(**vars(args))

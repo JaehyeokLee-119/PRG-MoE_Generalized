@@ -463,6 +463,16 @@ class LearningEnv:
                                                     window_constraint=1000
                                                     )
 
+            
+                '''
+                준비물 정리:
+                    emotion_prediction
+                    binary_cause_prediction
+                    emotion_label_batch
+                    pair_binary_cause_label_batch
+                    check_pair_window_idx
+                    check_pair_pad_idx
+                '''
 
                 # 1번 과정: model emotion prediction을 [5, 26, 7] -> [5, 351]로 만듦
                 emotion_list = emotion_prediction.view(batch_size, -1, 7)
@@ -536,31 +546,10 @@ class LearningEnv:
                 '''
                 # 5-0) 위 정답 여부 추출 과정이 잘 이루어졌는지 원래 입력들을 확인해서 검증해보기
                 # 원래 문장과 그 cause의 쌍, predicted emotion과 true emotion를 정리 
-                input = utterance_input_ids_batch #[5, 26, 75]
-                input_pair_form_list = []
-                for doc_input in utterance_input_ids_batch:
-                    end_t = 0
-                    for utt_input in doc_input:
-                        for _ in range(end_t+1):
-                            input_pair_form_list.append(utt_input) # 여기에 각 cause를 붙이기
-                        end_t += 1
-                input_pair_form = torch.stack(input_pair_form_list).view(batch_size, -1, max_seq_len)
-                
-                from transformers import BertTokenizer
-                tokenizer_ = BertTokenizer.from_pretrained('bert-base-cased')
-                tokenizer_.decode(input_pair_form[0][0])
-                def num_to_emotion(num):
-                    emotion_policy = ['angry', 'disgust', 'fear', 
-                                      'happy', 'sad, frustrated', 'surprise', 'neutral']
-                    return emotion_policy[num]
-                # num_to_emotion(emotion_pair_true_expanded[0][0].item())
-                
                 # check_pair_window_idx: emotion 예측 기준, window이 되는 발화를 1로 표시 (emotion prediction 기반)
                 # check_pair_pad_idx: window에 포함될 수 있는 모든 발화를 1로 표시 
                 # 5번) emotion, pair의 정답 여부를 비교하고 추려서 통계값으로 만든다 (predicted window 기준)
-                # 5-1) emotion은 틀리고 pair를 맞춘 것의 개수 
                 num_emo_x_pair_o = ((emotion_correct_windowed==False) & (pair_correct_windowed==True)).count_nonzero().item() # : 16
-                # 5-2) emotion은 맞추고 pair도 맞춘 것의 개수
                 num_emo_o_pair_o = (emotion_correct_windowed & pair_correct_windowed).count_nonzero().item() # : 28
                 num_emo_x_pair_x = ((emotion_correct_windowed==False) & (pair_correct_windowed==False)).count_nonzero().item()
                 num_emo_o_pair_x = ((emotion_correct_windowed==True) & (pair_correct_windowed==False)).count_nonzero().item()
@@ -612,6 +601,18 @@ class LearningEnv:
             if allocated_gpu == 0:
                 logger.info(f'\nEpoch: [{self.num_epoch}/{self.training_iter}]')
                 p_cau, r_cau, f1_cau = log_metrics(logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option=option)
+            
+                # pair 유효성 검증
+                logger.info(f"\n[Pair emotion validation] Entire pair candidates: {cnt_entire_pair_candidate}\n"+
+                    f"Number of correct pairs: {cnt_correct_pairs}\n"+
+                    f"Number of emotion x pair o: {cnt_emo_x_pair_o}\n"+
+                    f"Number of emotion o pair o: {cnt_cmo_o_pair_o}\n"+
+                    f"Number of emotion x pair x: {cnt_emo_x_pair_x}\n"+
+                    f"Number of emotion o pair x: {cnt_cmo_o_pair_x}"
+                    )
+                
+            
+            
             del valid_dataloader
 
             if option == 'valid' and allocated_gpu == 0:
